@@ -1,0 +1,11 @@
+# Tabula Scripta
+
+So, this is a probably too ambitious attempt at making a sort of forms+spreadsheets+scripting combo. 
+
+Currently, the plans for it are as follows:
+
+- Build a k/v storage API for use with spreadsheets
+  - Start with a sheet/k/v list of triples?
+- Build a spreadsheet UI, starting out with something *very* rudimentary, and potentially integrating an existing client-side spreadsheet GUI library.
+  - Unsure how to do this well, for now, I'm ok with having to manually specify sheet bounds
+- Build a simple scripting language, based on TinScript, used to extend formulas, as well as specify forms. 

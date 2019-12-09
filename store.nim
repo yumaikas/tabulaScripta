@@ -1,4 +1,4 @@
-import db_sqlite, sequtils, strformat, strutils, os
+import db_sqlite, sequtils, strformat, strutils, os, tables
 
 type 
   Database* = ref object
@@ -9,6 +9,18 @@ type
     col*: int
     row*: int
     content*: string
+  EntryType* = enum
+    etFolder,
+    etForm,
+    etSheet,
+    etScript
+  
+  FolderEntry* = object
+    id*: int
+    name*: string
+    entryType*: EntryType
+    
+
 
 
 proc newDatabase*(filename = "tabulascripting.db"): Database =
@@ -32,26 +44,14 @@ type CellRange = object
   colBegin*: int
   colEnd*: int
 
-proc initRange(rowBegin, rowEnd, colBegin, colEnd: int): CellRange =
+proc initRange*(rowBegin, rowEnd, colBegin, colEnd: int): CellRange =
   return CellRange(
     rowBegin: rowBegin,
     rowEnd: rowEnd,
     colBegin: colBegin,
     colEnd: colEnd)
 
-# Don't think I need this here
-#[
-proc getGrid*(db: Database, SheetId: int, x,y,h,w: int: seq[seq[Cell]] =
-  let r = initRange(x, y, x + h, y + w)
-  let cells = db.getCells(SheetId, r)
-  result = newSeq[seq[cell]]()
-  result.setLen(w)
-  for i in 0..w:
-
-]#
-
-
-proc getCells*(db: Database, SheetId: int, area: CellRange ): seq[Cell] =
+proc getCells*(db: Database, SheetId: int, area: CellRange): seq[Cell] =
   let conn = db.db
   result = newSeq[Cell]()
   let query = sql"""
@@ -70,11 +70,40 @@ proc getCells*(db: Database, SheetId: int, area: CellRange ): seq[Cell] =
       content: row[2]
     ))
 
+# Sheets created under folderId 0 are built under the root folder
+proc createSheet*(db: Database, name: string, folderId: int = 0): int =
+  let conn = db.db
+  conn.exec(sql"""
+    Insert into Sheets (Name, FolderId, Created) 
+    values (?, ?, strftime('%s', 'now'));
+  """, name, folderId)
+
+proc getGrid*(db: Database, SheetId: int, x,y,h,w: int): TableRef[(int,int), string] =
+  let r = initRange(x, x + h, y, y + w)
+  let cells = db.getCells(SheetId, r)
+  result = newTable[(int, int), string]()
+  for cell in cells:
+    result[(cell.col, cell.row)] = cell.content
+
 proc setup*(database: Database) =
   let db = database.db
   db.exec(sql"""
+  Create Table if not exists Folders (
+    FolderId INTEGER PRIMARY KEY,
+    ParentId int,
+    Tags text,
+    Name text,
+    Created int, -- unix timestamp
+    Updated int, -- unix timestamp
+    Deleted int, -- unix timestamp
+  )
+  """)
+
+  db.exec(sql"""
   Create Table if not exists Sheets (
     SheetId INTEGER PRIMARY KEY,
+    FolderId int,
+    Tags text,
     Name text,
     Created int, -- unix timestamp
     Updated int, -- unix timestamp
@@ -94,6 +123,8 @@ proc setup*(database: Database) =
   db.exec(sql"""
   Create Table if not exists Scripts (
     ScriptId INTEGER PRIMARY KEY,
+    FolderId int,
+    Tags text,
     Name text,
     Content text,
     Created int, -- unix timestamp
@@ -104,6 +135,8 @@ proc setup*(database: Database) =
   db.exec(sql"""
   Create Table if not exists Forms (
     FormId INTEGER PRIMARY KEY,
+    FolderId int,
+    Tags text,
     Name text,
     Content text,
     Created int, -- unix timestamp
@@ -124,6 +157,14 @@ when isMainModule:
     Cell(row:1, col:5, content: "E")
   ])
   echo db.getCells(0, initRange(1,1,2,4))
+  db.saveCells(0, @[
+    Cell(row:1, col:1, content: "V"),
+    Cell(row:1, col:2, content: "W"),
+    Cell(row:1, col:3, content: "X"),
+    Cell(row:1, col:4, content: "Y"),
+    Cell(row:1, col:5, content: "Z")
+  ])
+  echo db.getGrid(0,1,1,5,5)
   db.close()
   removeFile("test.db")
 

@@ -1,6 +1,7 @@
 import jester
 
-import webConfig, views, store, seqUtils
+import webConfig, views, store
+import seqUtils, tables
 from nativesockets import Port
 
 var bindAddr = "localhost"
@@ -12,14 +13,23 @@ settings:
   port = nativesockets.Port(webConfig.PORT)
   bindAddr = bindAddr
 
-
 routes:
   get "/":
     # TODO: This is a test view for now
     resp homeView(@[
-      FolderEntry(id:0, name:"Test Sheet", entryType: etSheet),
-      FolderEntry(id:1, name:"Test Sheet 1", entryType: etSheet)
+      FolderEntry(id:(-1), name:"Test Sheet", entryType: etSheet),
+      FolderEntry(id:(-2), name:"Test Sheet 1", entryType: etSheet)
     ])
+  get "/sheet/-1":
+    let cells = newTable(@[
+        ((1, 1), CellContent(content: "Test", isUserReadOnly: false)),
+        ((1, 2), CellContent(content: "Test 1", isUserReadOnly: false)),
+        ((1, 3), CellContent(content: "test 2", isUserReadOnly: false)),
+        ((1, 4), CellContent(content: "Foo", isUserReadOnly: false)),
+        ((37, 5), CellContent(content: "Crackers", isUserReadOnly: false))
+        ])
+
+    resp sheetView(SheetEntry(id: (-1), name: "Test Sheet", cells: cells))
 
 
   get "/folder/@id":

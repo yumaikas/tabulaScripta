@@ -4,11 +4,16 @@ type
   Database* = ref object
     db*: DbConn
 
+  CellContent* = object
+    content*: string
+    isUserReadOnly*: bool
+
   # A cell for a spreadsheet
   Cell* = object
     col*: int
     row*: int
-    content*: string
+    content*: CellContent
+
   EntryType* = enum
     etFolder,
     etForm,
@@ -19,9 +24,30 @@ type
     id*: int
     name*: string
     entryType*: EntryType
-    
 
+  SheetEntry* = object
+    id*: int
+    name*: string
+    cells*: TableRef[(int, int), CellContent]
 
+  SheetExtents = object
+    colMax*: int
+    rowMax*: int
+
+proc initCell(col, row: int, content: string): Cell =
+  return Cell(col: col, row: row, content: CellContent(content: content, isUserReadOnly: false))
+
+proc computeExtents*(sheet: SheetEntry): SheetExtents =
+  var colMax = 0
+  var rowMax = 0
+  for rowCol in sheet.cells.keys:
+    let (colIdx, rowIdx) = rowCol
+    colMax = max(colIdx, colMax)
+    rowMax = max(rowIdx, rowMax)
+  result = SheetExtents(colMax: colMax, rowMax: rowMax)
+
+proc isUserReadOnly*(cell: Cell): bool =
+  return cell.content.isUserReadOnly
 
 proc newDatabase*(filename = "tabulascripting.db"): Database =
   new result
@@ -67,7 +93,7 @@ proc getCells*(db: Database, SheetId: int, area: CellRange): seq[Cell] =
     result.add(Cell(
       row: row[0].parseInt,
       col: row[1].parseInt,
-      content: row[2]
+      content: CellContent(content: row[2], isUserReadOnly: false)
     ))
 
 # Sheets created under folderId 0 are built under the root folder
@@ -78,10 +104,10 @@ proc createSheet*(db: Database, name: string, folderId: int = 0): int =
     values (?, ?, strftime('%s', 'now'));
   """, name, folderId)
 
-proc getGrid*(db: Database, SheetId: int, x,y,h,w: int): TableRef[(int,int), string] =
+proc getGrid*(db: Database, SheetId: int, x,y,h,w: int): TableRef[(int,int), CellContent] =
   let r = initRange(x, x + h, y, y + w)
   let cells = db.getCells(SheetId, r)
-  result = newTable[(int, int), string]()
+  result = newTable[(int, int), CellContent]()
   for cell in cells:
     result[(cell.col, cell.row)] = cell.content
 
@@ -150,19 +176,19 @@ when isMainModule:
   db.setup()
 
   db.saveCells(0, @[
-    Cell(row:1, col:1, content: "A"),
-    Cell(row:1, col:2, content: "B"),
-    Cell(row:1, col:3, content: "C"),
-    Cell(row:1, col:4, content: "D"),
-    Cell(row:1, col:5, content: "E")
+    initCell(1, 1, "A"),
+    initCell(2, 1, "B"),
+    initCell(3, 1, "C"),
+    initCell(4, 1, "D"),
+    initCell(5, 1, "E")
   ])
   echo db.getCells(0, initRange(1,1,2,4))
   db.saveCells(0, @[
-    Cell(row:1, col:1, content: "V"),
-    Cell(row:1, col:2, content: "W"),
-    Cell(row:1, col:3, content: "X"),
-    Cell(row:1, col:4, content: "Y"),
-    Cell(row:1, col:5, content: "Z")
+    initCell(1, 1,"V"),
+    initCell(2, 1, "W"),
+    initCell(3, 1, "X"),
+    initCell(4, 1, "Y"),
+    initCell(5, 1, "Z")
   ])
   echo db.getGrid(0,1,1,5,5)
   db.close()

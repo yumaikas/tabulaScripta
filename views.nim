@@ -1,5 +1,5 @@
 import store, webConfig
-import sugar, strutils, strformat
+import sugar, strutils, strformat, tables
 import htmlgen, markdown
 
 proc css*(): string =
@@ -15,6 +15,12 @@ proc css*(): string =
     fore_color = "#EFC121"
     link_color = "F0FF00"
     visted_color = "#a5622a"
+  elif THEME == "AMBER":
+    back_color = "black"
+    fore_color = "yellow"
+    link_color = "yellow"
+    visted_color = "#f1ad14"
+
   # Right now, the implicit default theme is AQUA, if we don't recognize the current theme.
     
 
@@ -28,11 +34,24 @@ body,input,textarea {{
   background: {back_color};
   color: {fore_color};
 }}
-td {{ margin: 5px; }}
+table {{
+  border-collapse: collapse;
+}}
+table input {{
+  border: none;
+}}
+tr {{
+  min-height: 20px;
+}}
+td {{
+  margin: 5px;
+  border: 1px solid {fore_color};
+  min-width: 2em;
+  min-height: 1em;
+}}
 a {{ color: {link_color}; }}
 a:visited {{ color: {visted_color}; }}
 """)
-
 
 proc pageBase(inner: string): string =
   return "<!DOCTYPE html>" & html(
@@ -62,8 +81,62 @@ proc homeView*(links: seq[FolderEntry]): string =
     output.add("</div>")
   result = pageBase(output.join(""))
 
+# Algorithm is a nim port of https://stackoverflow.com/a/2652855/823592
+proc numToAlpha(num: int): string =
+  if num <= 26:
+    return $chr(num + 64)
+  var acc: int = num
+  result = ""
+  var d = acc div 26
+  var rem = acc mod 26
+  if rem == 0:
+    rem = 26
+    dec(d)
+  return numToAlpha(d) & numToAlpha(rem)
+
+proc colHeader(idx: int): CellContent =
+  return CellContent(
+    content: "<em>" & numToAlpha(idx) & "</em>",
+    isUserReadOnly: true)
+
+proc rowHeader(idx: int): CellContent =
+  return CellContent(
+    content:"<em>" & $idx & "</em>",
+    isUserReadOnly: true)
 
 
+proc sheetView*(sheet: SheetEntry): string =
+  var output = newSeq[string]()
+  output.add(h2("Tabula Scripta &gt; " & sheet.name))
+  let extents = sheet.computeExtents()
+  # Prepare the border rows/cells
+  sheet.cells[(0,0)] = CellContent(isUserReadOnly: true)
+  for rowIdx in 1..extents.rowMax:
+    sheet.cells[(0, rowIdx)] = rowHeader(rowIdx)
+  for colIdx in 1..extents.colMax:
+    sheet.cells[(colIdx, 0)] = colHeader(colIdx)
+
+  output.add(p($extents))
+  output.add("<table>")
+  for rowIdx in 0..extents.rowMax:
+    output.add("<tr>")
+    for colIdx in 0..extents.colMax:
+      let cellKey = (colIdx, rowIdx)
+      if not(sheet.cells.hasKey(cellKey)):
+        output.add("<td>")
+        output.add(input(`type`="text", value=""))
+        output.add("</td>")
+        continue
+      let cell = sheet.cells[cellKey]
+      output.add("<td>")
+      if cell.isUserReadOnly:
+        output.add(cell.content)
+      else:
+        output.add(input(`type`="text", value=cell.content))
+      output.add("</td>")
+    output.add("</tr>")
+  result = pageBase(output.join(""))
+  
 # HTML inputs for editing various fields on ideas
 
 # proc notesEditor(idea: Idea): string =

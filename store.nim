@@ -30,6 +30,11 @@ type
     name*: string
     cells*: TableRef[(int, int), CellContent]
 
+  FormEntry* = object
+    id*: int
+    name*: string
+    script: string
+
   SheetExtents = object
     colMax*: int
     rowMax*: int
@@ -56,6 +61,12 @@ proc newDatabase*(filename = "tabulascripting.db"): Database =
 proc close*(database: Database) =
   database.db.close()
 
+template withDb*(filename:string = "tabulaScripta.db", code: untyped): untyped =
+  let db {.inject.} = newDatabase(fileName)
+  defer: db.close()
+  block:
+    code
+
 proc saveCells*(db: Database, SheetId: int, cells: seq[Cell]) =
   let conn = db.db
   for cell in cells:
@@ -81,6 +92,7 @@ proc getCells*(db: Database, SheetId: int, area: CellRange): seq[Cell] =
   let conn = db.db
   result = newSeq[Cell]()
   let query = sql"""
+
   Select RowId, ColumnId, Content from Cells
   where SheetId = ?
     AND (RowId <= ? AND RowId >= ?) 
@@ -99,10 +111,31 @@ proc getCells*(db: Database, SheetId: int, area: CellRange): seq[Cell] =
 # Sheets created under folderId 0 are built under the root folder
 proc createSheet*(db: Database, name: string, folderId: int = 0): int =
   let conn = db.db
-  conn.exec(sql"""
+  result = int(conn.insertID(sql"""
     Insert into Sheets (Name, FolderId, Created) 
     values (?, ?, strftime('%s', 'now'));
-  """, name, folderId)
+  """, name, folderId))
+
+proc createForm*(db: Database, name: string, folderId: int = 0): int =
+  let conn = db.db
+  result = int(conn.insertID(sql"""
+    Insert into Forms (Name, FolderId, Created) 
+    values (?, ?, strftime('%s', 'now'));
+  """, name, folderId))
+
+proc createScript*(db: Database, name: string, folderId: int = 0): int =
+  let conn = db.db
+  result = int(conn.insertID(sql"""
+    Insert into Scripts (Name, FolderId, Created) 
+    values (?, ?, strftime('%s', 'now'));
+  """, name, folderId))
+
+proc createFolder*(db: Database, name: string, folderId: int = 0): int =
+  let conn = db.db
+  result = int(conn.insertID(sql"""
+    Insert into Folders (Name, FolderId, Created) 
+    values (?, ?, strftime('%s', 'now'));
+  """, name, folderId))
 
 proc getGrid*(db: Database, SheetId: int, x,y,h,w: int): TableRef[(int,int), CellContent] =
   let r = initRange(x, x + h, y, y + w)
@@ -110,6 +143,12 @@ proc getGrid*(db: Database, SheetId: int, x,y,h,w: int): TableRef[(int,int), Cel
   result = newTable[(int, int), CellContent]()
   for cell in cells:
     result[(cell.col, cell.row)] = cell.content
+
+proc getSheet*(db: Database, sheetId: int): SheetEntry =
+  let conn = db.db
+  let name = conn.getValue(sql"""Select Name from Sheets where SheetId = ?""", sheetId)
+  let cells = db.getGrid(sheetId, 0,0, high(int), high(int))
+  result = SheetEntry(id:sheetId,name: name, cells: cells)
 
 proc setup*(database: Database) =
   let db = database.db
@@ -121,8 +160,8 @@ proc setup*(database: Database) =
     Name text,
     Created int, -- unix timestamp
     Updated int, -- unix timestamp
-    Deleted int, -- unix timestamp
-  )
+    Deleted int -- unix timestamp
+  );
   """)
 
   db.exec(sql"""
@@ -137,16 +176,6 @@ proc setup*(database: Database) =
   );""")
 
   db.exec(sql"""
-  Create Table if not exists Cells (
-    CellId INTEGER PRIMARY KEY,
-    SheetId int,
-    RowId int,
-    ColumnId int,
-    Content text,
-    UNIQUE(SheetId, RowId, ColumnId) ON CONFLICT REPLACE
-  );""")
-
-  db.exec(sql"""
   Create Table if not exists Scripts (
     ScriptId INTEGER PRIMARY KEY,
     FolderId int,
@@ -156,6 +185,16 @@ proc setup*(database: Database) =
     Created int, -- unix timestamp
     Updated int, -- unix timestamp
     Deleted int -- unix timestamp
+  );""")
+
+  db.exec(sql"""
+  Create Table if not exists Cells (
+    CellId INTEGER PRIMARY KEY,
+    SheetId int,
+    RowId int,
+    ColumnId int,
+    Content text,
+    UNIQUE(SheetId, RowId, ColumnId) ON CONFLICT REPLACE
   );""")
 
   db.exec(sql"""

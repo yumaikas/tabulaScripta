@@ -22,7 +22,6 @@ proc css*(): string =
     visted_color = "#f1ad14"
 
   # Right now, the implicit default theme is AQUA, if we don't recognize the current theme.
-    
 
   return style(&"""
 body {{
@@ -53,7 +52,7 @@ a {{ color: {link_color}; }}
 a:visited {{ color: {visted_color}; }}
 """)
 
-proc pageBase(inner: string): string =
+proc pageBase(inner: string, showHeader: bool = true): string =
   return "<!DOCTYPE html>" & html(
     head(
       meta(charset="utf-8"),
@@ -61,6 +60,7 @@ proc pageBase(inner: string): string =
     ),
     body(
       css(),
+      h2("Tabula Scripta"),
       inner
     )
   )
@@ -68,7 +68,6 @@ proc pageBase(inner: string): string =
 proc homeView*(links: seq[FolderEntry]): string =
   var output = newSeq[string]()
 
-  output.add(h2("Tabula Scripta"))
   template emitLink(link: FolderEntry, urlPrefix: string) =
     output.add(h3(a(href=(urlPrefix & $link.id), link.name)))
   for link in links:
@@ -79,7 +78,22 @@ proc homeView*(links: seq[FolderEntry]): string =
       of etSheet: emitLink(link, "/sheet/")
       of etScript: emitLink(link, "/script")
     output.add("</div>")
+  output.add(a(href="/create/0", "Create New..."))
   result = pageBase(output.join(""))
+
+proc createView*(folderId: int): string =
+  proc btn(url, text: string): string =
+    return button(formaction=url & $folderId, formmethod="POST", text)
+
+  result = pageBase(
+    form(enctype="multipart/form-data", action="POST",
+      style("button { display: block; }"),
+      label("Name:", input(name="name", id="name", type="text")),
+      btn("/create/sheet/", "Create Spreadsheet"),
+      btn("/create/form/", "Create Form"),
+      btn("/create/folder/", "Create Folder"),
+      btn("/create/script/", "Create Script"),
+  ))
 
 # Algorithm is a nim port of https://stackoverflow.com/a/2652855/823592
 proc numToAlpha(num: int): string =
@@ -104,7 +118,6 @@ proc rowHeader(idx: int): CellContent =
     content:"<em>" & $idx & "</em>",
     isUserReadOnly: true)
 
-
 proc sheetView*(sheet: SheetEntry): string =
   var output = newSeq[string]()
   output.add(h2("Tabula Scripta &gt; " & sheet.name))
@@ -116,7 +129,6 @@ proc sheetView*(sheet: SheetEntry): string =
   for colIdx in 1..extents.colMax:
     sheet.cells[(colIdx, 0)] = colHeader(colIdx)
 
-  output.add(p($extents))
   output.add("<table>")
   for rowIdx in 0..extents.rowMax:
     output.add("<tr>")
@@ -152,5 +164,4 @@ proc tableWith(inner: () -> string): string =
 
 proc errorPage*(message: string): string =
   return pageBase(message)
-
   

@@ -1,7 +1,6 @@
 import strtabs, tables, strutils
 import tabulaLex
 
-
 type 
   tabulaFunc = proc(vm: tabulaVM, next: tokenFunc)
 

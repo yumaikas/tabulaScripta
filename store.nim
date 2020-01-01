@@ -18,7 +18,7 @@ type
     etFolder,
     etForm,
     etSheet,
-    etScript
+    etScript,
   
   FolderEntry* = object
     id*: int
@@ -33,18 +33,28 @@ type
   FormEntry* = object
     id*: int
     name*: string
-    script: string
+    script*: string
 
   SheetExtents = object
     colMax*: int
     rowMax*: int
 
+proc parseEntryType(typeStr: string): EntryType =
+  case typeStr:
+    of "Folder": return etFolder
+    of "Form": return etForm
+    of "Sheet": return etSheet
+    of "Script": return etScript
+    else:
+      raise newException(Exception, "Invalid entry type "&typeStr&"!")
+
 proc initCell(col, row: int, content: string): Cell =
   return Cell(col: col, row: row, content: CellContent(content: content, isUserReadOnly: false))
 
 proc computeExtents*(sheet: SheetEntry): SheetExtents =
-  var colMax = 0
-  var rowMax = 0
+  # We want to have a minimum size of table to display
+  var colMax = 10
+  var rowMax = 40
   for rowCol in sheet.cells.keys:
     let (colIdx, rowIdx) = rowCol
     colMax = max(colIdx, colMax)
@@ -150,6 +160,35 @@ proc getSheet*(db: Database, sheetId: int): SheetEntry =
   let cells = db.getGrid(sheetId, 0,0, high(int), high(int))
   result = SheetEntry(id:sheetId,name: name, cells: cells)
 
+proc getFolderItems*(db: Database, folderId: int): seq[FolderEntry] =
+  let conn = db.db
+  let query = sql"""
+  Select FolderId as Id, Name, 'Folder' as Type, Created, Updated, Deleted from Folders where ParentId = ?
+  union all
+  Select SheetId as Id, Name, 'Sheet' as Type, Created, Updated, Deleted from Sheets where FolderId = ?
+  union all
+  Select ScriptId as Id, Name, 'Script' as Type, Created, Updated, Deleted from Scripts where FolderId = ?
+  union all
+  Select FormId as Id, Name, 'Form' as Type, Created, Updated, Deleted from Forms where FolderId = ?
+  """
+  let fId = folderId
+  result = newSeq[FolderEntry]()
+  for row in conn.fastRows(query, fId, fId, fId, fId):
+    result.add(FolderEntry(
+      id: row[0].parseInt,
+      name: row[1],
+      entryType: parseEntryType(row[2])
+    ))
+
+proc getForm*(db: Database, formId: int): FormEntry =
+  let conn = db.db
+  let query = sql"""
+  Select Name, Content from Forms where FormId = ? 
+  """
+  let row = conn.getRow(query, formId)
+  result = FormEntry(id:formId, name: row[0], script: row[1])
+
+
 proc setup*(database: Database) =
   let db = database.db
   db.exec(sql"""
@@ -213,6 +252,13 @@ proc setup*(database: Database) =
 when isMainModule:
   var db = newDatabase("test.db")
   db.setup()
+
+  echo db.createSheet("TestSheet")
+  echo db.createForm("TestForm")
+  echo db.createScript("TestScript")
+  echo db.createFolder("TestFolder")
+
+  echo db.getFolderItems(0)
 
   db.saveCells(0, @[
     initCell(1, 1, "A"),

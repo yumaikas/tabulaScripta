@@ -15,6 +15,6 @@ router formRoutes:
   get "/edit/@formId":
     withDb(DB_FILE):
       resp formEditorView(db.getForm((@"formId").parseInt))
-  get "/@formId":
+  get "/view/@formId":
     resp "TODO: Execute form script, show results"
 

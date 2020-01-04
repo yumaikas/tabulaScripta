@@ -27,12 +27,6 @@ routes:
 
   get "/script/@id":
     resp "TODO: Script by Id"
-     
-  get "/form/@id":
-    resp "TODO: Form by Id"
-
-  get "/edit/form/@id":
-    resp "TODO: Show form editor"
 
   post "/saveData/@sheetId":
     resp "TODO: Take a JSON object of kv pairs, and save it into the database, then return any updates that happened as a result of updating formulas"

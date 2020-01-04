@@ -32,21 +32,33 @@ router creatorRoutes:
   post "/form/@folderId":
     withDb(DB_FILE):
       let formData = request.formData
+      let parentFolderId = (@"folderId").parseInt
       assert "name" in formData
-      let formId = db.createForm(formData["name"].body)
+      let formId = db.createForm(formData["name"].body, parentFolderId)
       redirect("/form/" & $formId)
 
   post "/sheet/@folderId":
     withDb(DB_FILE):
       let formData = request.formData
+      let parentFolderId = (@"folderId").parseInt
       assert "name" in formData
-      let sheetId = db.createSheet(formData["name"].body)
+      let sheetId = db.createSheet(formData["name"].body, parentFolderId)
       redirect("/form/" & $sheetId)
 
   post "/folder/@folderId":
-    resp "TODO: redirect to newly created folder"
+    withDb(DB_FILE):
+      let formData = request.formData
+      let parentFolderId = (@"folderId").parseInt
+      assert "name" in formData
+      let folderId = db.createFolder(formData["name"].body, parentFolderId)
+      redirect("/folder/" & $folderId)
 
   post "/script/@folderId":
-    resp "TODO: redirect to newly created script"
+    withDb(DB_FILE):
+      let formData = request.formData
+      let parentFolderId = (@"folderId").parseInt
+      assert "name" in formData
+      let folderId = db.createScript(formData["name"].body, parentFolderId)
+      redirect("/script/" & $folderId)
 
 

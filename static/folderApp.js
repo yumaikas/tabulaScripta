@@ -115,6 +115,11 @@ c.ready(function() {
                        ];
                     }
                     return ['div', [
+                        ['style', 
+                            ['.action', {
+                                'text-decoration': 'underline'
+                            }]
+                        ],
                         dale.do(folders, function(fl) { return link(fl); }), 
                         createView,
                     ]

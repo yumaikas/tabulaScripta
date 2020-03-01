@@ -1,4 +1,4 @@
-import htmlgen, strutils
+import htmlgen, strutils, json, strformat
 import ".."/store, ".."/webConfig, ".."/jsreq, ".."/viewbase
 import jester
 
@@ -17,8 +17,23 @@ proc lsFolderView*(links: seq[FolderEntry]): string =
   output.add(a(href="/create/0", "Create New..."))
   result = pageBase(output.join(""))
 
-router folderRoutes:
-  get "/@folderId":
-    withDb(DB_FILE):
-      resp lsFolderView(db.getFolderItems((@"folderId").parseInt))
+proc lsFolderSPA*(folderId: int): string =
+  return pageBase(fmt"""
+  <div id="folderapp"></div>
+  <input type="hidden" id="folderId" name="folderId" value="{$folderId}"/>
+  <script src="/folderApp.js"></script>
+  """)
 
+proc lsFolderJson*(links: seq[FolderEntry]): string =
+  return pretty(%*(links))
+
+router folderRoutes:
+  get "/view/@folderId":
+    resp lsFolderSPA((@"folderId").parseInt)
+    # withDb(DB_FILE):
+    #   resp lsFolderView(db.getFolderItems((@"folderId").parseInt))
+
+  get "/api/@folderId":
+    withDb(DB_FILE):
+      # RESUME: Add JSON content header here
+      resp lsFolderJson(db.getFolderItems((@"folderId").parseInt)), "application/json"

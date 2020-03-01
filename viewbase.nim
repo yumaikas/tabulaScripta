@@ -55,11 +55,13 @@ proc pageBase*(inner: string, showHeader: bool = true): string =
   return "<!DOCTYPE html>" & html(
     head(
       meta(charset="utf-8"),
-      meta(name="viewport", content="width=device-width, initial-scale=1.0"),
+      meta(name="viewport", content="width=device-width, initial-scale=1.0")
     ),
     body(
       css(),
       h2("Tabula Scripta"),
+      script(src="/gotoB.min.js"),
+      # It is expected that this will mostly be JS
       inner
     )
   )

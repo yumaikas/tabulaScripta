@@ -18,7 +18,7 @@ init()
 settings:
   port = nativesockets.Port(webConfig.PORT)
   bindAddr = bindAddr
-  staticDir = "./client"
+  staticDir = "./static"
 
 routes:
   get "/":

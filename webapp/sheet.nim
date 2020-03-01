@@ -36,7 +36,7 @@ proc sheetView*(sheet: SheetEntry): string =
   for colIdx in 1..extents.colMax:
     sheet.cells[(colIdx, 0)] = colHeader(colIdx)
 
-  output.add("<table>")
+  output.add("<table class=\"spreadSheet\">")
   for rowIdx in 0..extents.rowMax:
     output.add("<tr>")
     for colIdx in 0..extents.colMax:

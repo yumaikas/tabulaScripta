@@ -1,4 +1,4 @@
-import htmlgen, strutils
+import htmlgen, strutils, json
 import ".."/store, ".."/webConfig, ".."/jsreq, ".."/viewbase
 import jester
 
@@ -28,37 +28,27 @@ proc createView*(folderId: int): string =
 router creatorRoutes:
   get "/@folderId":
     resp createView((@"folderId").parseInt)
-
-  post "/form/@folderId":
+  
+  post "/api/@folderId":
     withDb(DB_FILE):
       let formData = request.formData
       let parentFolderId = (@"folderId").parseInt
       assert "name" in formData
-      let formId = db.createForm(formData["name"].body, parentFolderId)
-      redirect("/form/" & $formId)
-
-  post "/sheet/@folderId":
-    withDb(DB_FILE):
-      let formData = request.formData
-      let parentFolderId = (@"folderId").parseInt
-      assert "name" in formData
-      let sheetId = db.createSheet(formData["name"].body, parentFolderId)
-      redirect("/form/" & $sheetId)
-
-  post "/folder/@folderId":
-    withDb(DB_FILE):
-      let formData = request.formData
-      let parentFolderId = (@"folderId").parseInt
-      assert "name" in formData
-      let folderId = db.createFolder(formData["name"].body, parentFolderId)
-      redirect("/folder/" & $folderId)
-
-  post "/script/@folderId":
-    withDb(DB_FILE):
-      let formData = request.formData
-      let parentFolderId = (@"folderId").parseInt
-      assert "name" in formData
-      let folderId = db.createScript(formData["name"].body, parentFolderId)
-      redirect("/script/" & $folderId)
+      let name = formData["name"].body
+      let entryType = formData["entryType"].body
+      if entryType == "etForm":
+        let formId = db.createForm(name, parentFolderId)
+        resp $formId, "application/json"
+      elif entryType == "etSheet":
+        let formId = db.createSheet(name, parentFolderId)
+        resp $formId, "application/json"
+      elif entryType == "etFolder":
+        let formId = db.createFolder(name, parentFolderId)
+        resp $formId, "application/json"
+      elif entryType == "etScript":
+        let formId = db.createScript(name, parentFolderId)
+        resp $formId, "application/json"
+      else:
+        resp Http400, "Invalid entryType!", "text/html"
 
 

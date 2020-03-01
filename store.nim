@@ -143,7 +143,7 @@ proc createScript*(db: Database, name: string, folderId: int = 0): int =
 proc createFolder*(db: Database, name: string, folderId: int = 0): int =
   let conn = db.db
   result = int(conn.insertID(sql"""
-    Insert into Folders (Name, FolderId, Created) 
+    Insert into Folders (Name, ParentId, Created) 
     values (?, ?, strftime('%s', 'now'));
   """, name, folderId))
 

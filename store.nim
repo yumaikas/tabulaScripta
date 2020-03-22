@@ -1,12 +1,21 @@
 import db_sqlite, sequtils, strformat, strutils, os, tables
+import numbering
 
 type 
   Database* = ref object
     db*: DbConn
 
   CellContent* = object
-    content*: string
-    isUserReadOnly*: bool
+    # What we got from the user
+    input*: string 
+    # What the spreadsheet engine resolved the input to.
+    # If a custom renderer is used, this will contain the arguments for the renderer, in JSON form.
+    output*: string 
+    # Used for styling a cell
+    styles*: seq[seq[string]]
+    # Used for things like "Does this cell have a custom renderer?" or "is this cell locked?"
+    # Mostly will be interpreted by the front-end
+    attrs*: Table[string, string]
 
   # A cell for a spreadsheet
   Cell* = object
@@ -28,7 +37,7 @@ type
   SheetEntry* = object
     id*: int
     name*: string
-    cells*: TableRef[(int, int), CellContent]
+    cells*: TableRef[string, CellContent]
 
   FormEntry* = object
     id*: int
@@ -48,21 +57,19 @@ proc parseEntryType(typeStr: string): EntryType =
     else:
       raise newException(Exception, "Invalid entry type "&typeStr&"!")
 
+# Load a cell with basic content
 proc initCell(col, row: int, content: string): Cell =
-  return Cell(col: col, row: row, content: CellContent(content: content, isUserReadOnly: false))
+  return Cell(col: col, row: row, content: CellContent(input: content, output:content))
 
-proc computeExtents*(sheet: SheetEntry): SheetExtents =
+#proc computeExtents(sheet: SheetEntry): SheetExtents =
   # We want to have a minimum size of table to display
-  var colMax = 10
-  var rowMax = 40
-  for rowCol in sheet.cells.keys:
-    let (colIdx, rowIdx) = rowCol
-    colMax = max(colIdx, colMax)
-    rowMax = max(rowIdx, rowMax)
-  result = SheetExtents(colMax: colMax, rowMax: rowMax)
-
-proc isUserReadOnly*(cell: Cell): bool =
-  return cell.content.isUserReadOnly
+  #  var colMax = 10
+  #  var rowMax = 40
+  #  for rowCol in sheet.cells.keys:
+  #    let (colIdx, rowIdx) = rowCol
+  #    colMax = max(colIdx, colMax)
+  #    rowMax = max(rowIdx, rowMax)
+  #  result = SheetExtents(colMax: colMax, rowMax: rowMax)
 
 proc newDatabase*(filename = "tabulascripting.db"): Database =
   new result
@@ -115,7 +122,7 @@ proc getCells*(db: Database, SheetId: int, area: CellRange): seq[Cell] =
     result.add(Cell(
       row: row[0].parseInt,
       col: row[1].parseInt,
-      content: CellContent(content: row[2], isUserReadOnly: false)
+      content: CellContent(input: row[2], output: row[2])
     ))
 
 # Sheets created under folderId 0 are built under the root folder
@@ -147,12 +154,12 @@ proc createFolder*(db: Database, name: string, folderId: int = 0): int =
     values (?, ?, strftime('%s', 'now'));
   """, name, folderId))
 
-proc getGrid*(db: Database, SheetId: int, x,y,h,w: int): TableRef[(int,int), CellContent] =
+proc getGrid*(db: Database, SheetId: int, x,y,h,w: int): TableRef[string, CellContent] =
   let r = initRange(x, x + h, y, y + w)
   let cells = db.getCells(SheetId, r)
-  result = newTable[(int, int), CellContent]()
+  result = newTable[string, CellContent]()
   for cell in cells:
-    result[(cell.col, cell.row)] = cell.content
+    result[numToAlpha(cell.col) & ":" & $(cell.row)] = cell.content
 
 proc getSheet*(db: Database, sheetId: int): SheetEntry =
   let conn = db.db

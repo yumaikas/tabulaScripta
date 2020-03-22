@@ -1,4 +1,4 @@
-import store, webConfig, jsreq, viewbase
+import store, webConfig, viewbase
 import sugar, strutils, strformat, tables
 import htmlgen, markdown
 

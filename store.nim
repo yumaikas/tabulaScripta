@@ -1,4 +1,5 @@
-import db_sqlite, sequtils, strformat, strutils, os, tables
+import db_sqlite, sequtils, strutils, os, tables
+import json
 import numbering
 
 type 
@@ -14,7 +15,7 @@ type
     # Used for styling a cell
     styles*: seq[seq[string]]
     # Used for things like "Does this cell have a custom renderer?" or "is this cell locked?"
-    # Mostly will be interpreted by the front-end
+    # Mostly will be interpreted by the front-end, or by scripts
     attrs*: Table[string, string]
 
   # A cell for a spreadsheet
@@ -61,16 +62,6 @@ proc parseEntryType(typeStr: string): EntryType =
 proc initCell(col, row: int, content: string): Cell =
   return Cell(col: col, row: row, content: CellContent(input: content, output:content))
 
-#proc computeExtents(sheet: SheetEntry): SheetExtents =
-  # We want to have a minimum size of table to display
-  #  var colMax = 10
-  #  var rowMax = 40
-  #  for rowCol in sheet.cells.keys:
-  #    let (colIdx, rowIdx) = rowCol
-  #    colMax = max(colIdx, colMax)
-  #    rowMax = max(rowIdx, rowMax)
-  #  result = SheetExtents(colMax: colMax, rowMax: rowMax)
-
 proc newDatabase*(filename = "tabulascripting.db"): Database =
   new result
   result.db = open(filename, "", "", "")
@@ -88,9 +79,13 @@ proc saveCells*(db: Database, SheetId: int, cells: seq[Cell]) =
   let conn = db.db
   for cell in cells:
     conn.exec(sql"""
-      Insert Into Cells(SheetId, RowId, ColumnId, Content) 
-      values (?,?,?,?);""",
-      SheetId, cell.row, cell.col, cell.content )
+      Insert Into Cells(SheetId, RowId, ColumnId, Content, Attributes) 
+      values (?,?,?,?,?);""",
+      SheetId,
+      cell.row,
+      cell.col,
+      cell.content.input,
+      $(%*(cell.content.attrs)))
 
 type CellRange = object
   rowBegin*: int
@@ -104,6 +99,23 @@ proc initRange*(rowBegin, rowEnd, colBegin, colEnd: int): CellRange =
     rowEnd: rowEnd,
     colBegin: colBegin,
     colEnd: colEnd)
+
+proc getCellsForSheet(db: Database, SheetId: int): seq[Cell] =
+  let conn = db.db
+  result = newSeq[Cell]()
+  let query = sql"""
+    Select RowId, ColumnId, Content, Attributes from Cells
+    where SheetId = ?
+  """
+  for row in conn.fastRows(query, SheetId):
+    result.add(Cell(
+      row: row[0].parseInt,
+      col: row[1].parseInt,
+      content: CellContent(
+        input: row[2],
+        output: "",
+        attrs: (parseJson(row[3]).to(Table[string, string])
+        ))))
 
 proc getCells*(db: Database, SheetId: int, area: CellRange): seq[Cell] =
   let conn = db.db
@@ -239,7 +251,8 @@ proc setup*(database: Database) =
     SheetId int,
     RowId int,
     ColumnId int,
-    Content text,
+    Content text, -- User input
+    Attributes text, -- Attributes, as JSON
     UNIQUE(SheetId, RowId, ColumnId) ON CONFLICT REPLACE
   );""")
 

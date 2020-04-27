@@ -171,7 +171,9 @@ proc getGrid*(db: Database, SheetId: int, x,y,h,w: int): TableRef[string, CellCo
   let cells = db.getCells(SheetId, r)
   result = newTable[string, CellContent]()
   for cell in cells:
-    result[numToAlpha(cell.col) & ":" & $(cell.row)] = cell.content
+    # Filter out cells that don't have meaningful input
+    if len(cell.content.input) > 0:
+      result[numToAlpha(cell.col) & ":" & $(cell.row)] = cell.content
 
 proc getSheet*(db: Database, sheetId: int): SheetEntry =
   let conn = db.db

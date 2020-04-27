@@ -150,9 +150,7 @@ c.ready(function() {
                 prevCell.output = scratchVal || "";
                 B.set(['State', 'sheet', 'cells', prevCellAddr], prevCell);
                 // If we have a non-empty cell
-                if (prevCell.input.length > 0) {
-                    B.do('ajax', 'saveCell', prevCellAddr, prevCell);
-                }
+                B.do('ajax', 'saveCell', prevCellAddr, prevCell);
             }
             var cell = getCell(path);
             var cellAddr = path[path.length - 1];
@@ -169,6 +167,9 @@ c.ready(function() {
         ['ajax', 'loadCells', function(x, toLoad) {
             var lCells=  toLoad.cells;
             dale.do(lCells, function(v, k) {
+                var attr = v.attrs;
+                delete(v.attrs);
+                v.attr = attr;
                 B.set(['State', 'sheet', 'cells', k.replace(":", "_")], v);
             });
             B.do('change', ['State', 'sheet', 'cells']);

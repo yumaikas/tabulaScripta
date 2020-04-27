@@ -16,9 +16,9 @@ proc sheetJson*() =
   discard
 
 type cellToSave* = object
-
+  row*: int
+  col*: int
   input*: string
-  output*: string
   attrs*: Table[string, string]
 
 type cellSaveRequest* = object 
@@ -40,7 +40,12 @@ router sheetRoutes:
       var cells = newSeq[Cell]()
       for c in saveReq.cells:
         cells.add(Cell(
-        # TODO: Finish this up
+          row: c.row,
+          col: c.col,
+          content: CellContent(
+            input: c.input,
+            attrs: c.attrs
+          )
         ))
       db.saveCells(sheetId, cells);
       # This needs to respond with 

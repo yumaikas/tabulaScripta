@@ -23,7 +23,7 @@ settings:
 routes:
   get "/":
     withDb(DB_FILE):
-      resp lsFolderView(db.getFolderItems(0))
+      resp lsFolderSPA(0)
 
   get "/script/@id":
     resp "TODO: Script by Id"

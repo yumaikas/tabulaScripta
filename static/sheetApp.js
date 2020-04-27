@@ -8,6 +8,8 @@ c.ready(function() {
         return str[0].toUpperCase() + str.slice(1);
     };
 
+    var constSheetId = c.get("#sheetId", 'value').value;
+
     function formFromObj(obj) {
         var form = new FormData();
         dale.do(obj, function(v, k) {
@@ -30,6 +32,16 @@ c.ready(function() {
             d--;
         }
         return numToAlpha(d) + numToAlpha(rem);
+    };
+    // Take the excel-style coloumn designator, and turn it into a number
+    function alphaToNum(alpha) {
+        var letters = alpha.toUpperCase();
+        var sum = 0;
+        for (var i = 0; i < letters.length; i++) {
+            sum *= 26;
+            sum += (letters.charCodeAt(i) - ("A".charCodeAt(0) - 1));
+        }
+        return sum;
     };
     // TODO: Reverse the above operation
     function styleOf(pairs) {
@@ -103,7 +115,7 @@ c.ready(function() {
     }
     function getCell(path) {
         return B.get(path) || {
-            input:"",
+            input: "",
             output: "",
             attr: {},
             style: [],
@@ -137,6 +149,10 @@ c.ready(function() {
                 prevCell.input = scratchVal || "";
                 prevCell.output = scratchVal || "";
                 B.set(['State', 'sheet', 'cells', prevCellAddr], prevCell);
+                // If we have a non-empty cell
+                if (prevCell.input.length > 0) {
+                    B.do('ajax', 'saveCell', prevCellAddr, prevCell);
+                }
             }
             var cell = getCell(path);
             var cellAddr = path[path.length - 1];
@@ -150,9 +166,34 @@ c.ready(function() {
                 el.focus();
             }, 0);
         }],
+        ['ajax', 'loadCells', function(x, toLoad) {
+            var lCells=  toLoad.cells;
+            dale.do(lCells, function(v, k) {
+                B.set(['State', 'sheet', 'cells', k.replace(":", "_")], v);
+            });
+            B.do('change', ['State', 'sheet', 'cells']);
+        }],
         ['ajax', 'saveCell', function(x, cellAddr, value) {
-            // TODO!: Come back here
-            // c.ajax('POST', '/'
+
+            var addrBits = cellAddr.split("_");
+            var col = alphaToNum(addrBits[0]);
+            var row = Number.parseInt(addrBits[1]);
+            console.log(value);
+            var data = {
+                cells: [{
+                    row: row,
+                    col: col,
+                    input: value.input,
+                    attrs: value.attr,
+                }]
+            };
+
+            c.ajax('POST', '/sheet/api/data/' + constSheetId, {}, data,
+            function(err, resp){
+                if (err) console.log(err);
+                // TODO: Add in logic for patching cells here.
+                else console.log(resp);
+            });
         }],
         ['ajax', 'reportFailure', function(x, err) {
             console.error(err);
@@ -196,13 +237,13 @@ c.ready(function() {
     };
 
     B.mount('#sheetApp', sheetView());
-
-    B.set(['State', 'sheet','cells','A_1'], {
-        input: 'foo',
-        output: 'foo',
-        attr: {},
-        style: [[ "padding", "5px" ]],
-    });
     B.do('change', ['State', 'sheet', 'cells']);
+    c.ajax('GET', '/sheet/api/data/' + constSheetId, {}, {}, function(err, resp) {
+        if (err) {console.log(err); }
+        else {
+            B.do('ajax', 'loadCells', resp.body);
+        }
+
+    });
 });
 
